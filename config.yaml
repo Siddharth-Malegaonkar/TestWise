@@ -1,0 +1,33 @@
+﻿model:
+  target: outcome
+  version: testwise-lrts-non-tvm-v1
+  seed: 0
+  negative_sample_rate: 0.005
+  features:
+    - change_data_available
+    - changed_file_count
+    - additions
+    - deletions
+    - changed_test_file_count
+    - path_token_overlap_count
+    - path_token_overlap_ratio
+    - test_file_changed
+    - path_prefix_overlap_depth
+    - prior_runs
+    - prior_fails
+    - fail_rate
+    - fails_last5
+    - fails_last20
+    - last_outcome
+    - runs_since_fail
+    - last_duration
+    - mean_duration
+selection:
+  policy: top_k
+  top_k: 20
+  budget_seconds: null
+paths:
+  modeling_data: data/processed/lrts_v1/lrts_test_modeling_v1.csv.gz
+  run_audit: data/processed/lrts_v1/lrts_run_audit_v1.csv.gz
+  model: artifacts/models/testwise_lrts_non_tvm.joblib
+  results: artifacts/evaluation/lrts_non_tvm_results.csv
