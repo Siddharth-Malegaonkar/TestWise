@@ -46,7 +46,7 @@ def test_duration_budget(predictor):
 
 def test_final_artifact_round_trip_and_non_tvm_scope():
     if not DEFAULT_ARTIFACT.is_file():
-        pytest.skip("Final trained artifact is created by scripts/evaluate_lrts_non_tvm.py")
+        pytest.skip("Final trained artifact is created by scripts/evaluate_model.py")
     payload = joblib.load(DEFAULT_ARTIFACT)
     assert "tvm" not in {project.lower() for project in payload["training_projects"]}
     assert payload["excluded_projects"] == ["tvm"]

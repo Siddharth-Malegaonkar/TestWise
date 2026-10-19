@@ -11,3 +11,5 @@ models/
 pytest-cache-files-*/
 pytest-of-*/
 test-tmp/
+
+artifacts/evaluation/*.log

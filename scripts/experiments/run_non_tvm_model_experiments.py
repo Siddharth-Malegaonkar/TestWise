@@ -13,8 +13,8 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 
-sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parent))
-from evaluate_lrts_non_tvm import (  # noqa: E402
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1]))
+from evaluate_model import (  # noqa: E402
     AUDIT_PATH, BASE_FEATURES, FILE_LINK_FEATURES, FILE_LINK_PATH, ROOT,
     TABLE_FEATURES, TABLE_HAS_FILE_LINKS, TEST_PATH, attach_file_link_features,
     filter_non_tvm, load_file_link_sidecar, load_split_plan, split_masks,
@@ -260,7 +260,7 @@ def write_report(summary, differences, population, positives):
     lines = [
         '# Non-TVM model experiments', '', '## Measured protocol', '',
         'TVM was excluded before split construction and from fitting and scoring. Results use the established chronological 70/30 project/stage split with PR purge, seed 0, all positive training rows, and a deterministic 0.5% negative sample with inverse-probability weights.', '',
-        f'The corpus was rebuilt with `scripts/finalize_lrts_dataset.py --overwrite`. Training scanned {population:,} non-TVM rows with {positives:,} failures. The saved deployment artifact was not replaced.', '',
+        f'The corpus was rebuilt with `scripts/build_dataset.py --overwrite`. Training scanned {population:,} non-TVM rows with {positives:,} failures. The saved deployment artifact was not replaced.', '',
         f'Each metric is a mean over failing held-out run-stages. Ties use a seeded pseudorandom order shared by all methods within a run. Intervals are {BOOTSTRAP_REPS:,} percentile paired bootstraps that resample PR clusters within project; each replicate uses the same sampled PRs for every method. `failing_run_stage_weighted` weights projects by their failing run-stage counts; `macro_project` averages the nine project means.', '',
         '## Aggregate metrics', '',
         '| Model | Aggregation | APFD | Recall at 10% | Projects | Failing run-stages |',
@@ -296,7 +296,7 @@ def write_report(summary, differences, population, positives):
               '- `artifacts/evaluation/non_tvm_model_experiment_summary.csv` contains weighted and macro estimates.',
               '- `artifacts/evaluation/non_tvm_model_paired_differences.csv` contains all paired PR-clustered intervals and project win counts.',
               '- `artifacts/evaluation/non_tvm_model_experiments.csv` contains per-project estimates.',
-              '- `scripts/run_non_tvm_model_experiments.py` reproduces this report.', '']
+              '- `scripts/experiments/run_non_tvm_model_experiments.py` reproduces this report.', '']
     path.write_text('\n'.join(lines), encoding='utf-8')
 
 

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from scripts.evaluate_lrts_non_tvm import filter_non_tvm, load_split_plan
+from scripts.evaluate_model import filter_non_tvm, load_split_plan
 
 
 def test_tvm_is_removed_before_split_planning():
