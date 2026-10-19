@@ -1,0 +1,62 @@
+{
+  "version": "testwise-lrts-non-tvm-v1",
+  "target": "outcome",
+  "features": [
+    "change_data_available",
+    "changed_file_count",
+    "additions",
+    "deletions",
+    "changed_test_file_count",
+    "path_token_overlap_count",
+    "path_token_overlap_ratio",
+    "test_file_changed",
+    "path_prefix_overlap_depth",
+    "prior_runs",
+    "prior_fails",
+    "fail_rate",
+    "fails_last5",
+    "fails_last20",
+    "last_outcome",
+    "runs_since_fail",
+    "last_duration",
+    "mean_duration"
+  ],
+  "training_projects": [
+    "activemq",
+    "hadoop",
+    "hbase",
+    "hive",
+    "jackrabbit-oak",
+    "james",
+    "kafka",
+    "karaf",
+    "log4j"
+  ],
+  "excluded_projects": [
+    "tvm"
+  ],
+  "training_rows": 286242,
+  "training_positive_rows": 90711,
+  "negative_sample_rate": 0.005,
+  "seed": 0,
+  "model_config": {
+    "class": "RandomForestClassifier",
+    "n_estimators": 48,
+    "max_depth": 18,
+    "min_samples_leaf": 10,
+    "max_features": "sqrt",
+    "n_jobs": 1
+  },
+  "training_data": "data/processed/lrts_v1/lrts_test_modeling_v1.csv.gz",
+  "library_versions": {
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scikit_learn": "1.9.1",
+    "joblib": "1.6.0"
+  },
+  "evaluation": {
+    "protocol": "chronological per project/stage, 70/30; training PRs purged if PR appears in any test stage for that project",
+    "evaluation_manifest": "artifacts/evaluation/non_tvm_evaluation_manifest.json",
+    "results_csv": "artifacts/evaluation/lrts_non_tvm_results.csv"
+  }
+}

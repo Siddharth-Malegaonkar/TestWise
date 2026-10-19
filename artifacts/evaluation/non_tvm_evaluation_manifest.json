@@ -1,0 +1,61 @@
+{
+  "evaluation_version": "chronological_pr_purged_non_tvm",
+  "dataset_manifest": "data/processed/lrts_v1/lrts_manifest_v1.json",
+  "split": "chronological per project/stage, 70/30; training PRs purged if PR appears in any test stage for that project",
+  "training_projects": [
+    "activemq",
+    "hadoop",
+    "hbase",
+    "hive",
+    "jackrabbit-oak",
+    "james",
+    "kafka",
+    "karaf",
+    "log4j"
+  ],
+  "excluded_projects": [
+    "tvm"
+  ],
+  "negative_sample_rate": 0.005,
+  "negative_sample_weight": 200.0,
+  "seed": 0,
+  "features": [
+    "change_data_available",
+    "changed_file_count",
+    "additions",
+    "deletions",
+    "changed_test_file_count",
+    "path_token_overlap_count",
+    "path_token_overlap_ratio",
+    "test_file_changed",
+    "path_prefix_overlap_depth",
+    "prior_runs",
+    "prior_fails",
+    "fail_rate",
+    "fails_last5",
+    "fails_last20",
+    "last_outcome",
+    "runs_since_fail",
+    "last_duration",
+    "mean_duration"
+  ],
+  "model": "RandomForestClassifier(n_estimators=48, max_depth=18, min_samples_leaf=10, max_features=sqrt, n_jobs=1)",
+  "metrics": [
+    "APFD",
+    "recall@5/10/20%",
+    "failures_caught@5/10/20%",
+    "failing_run_stages_hit@5/10/20%",
+    "duration-weighted time_saved@5/10/20%"
+  ],
+  "outputs": [
+    "artifacts\\evaluation\\lrts_non_tvm_results.csv",
+    "artifacts\\evaluation\\non_tvm_count_diagnostics.csv",
+    "artifacts\\evaluation\\non_tvm_time_split_plan.csv",
+    "artifacts\\evaluation\\non_tvm_evaluation_manifest.json",
+    "artifacts\\models\\testwise_lrts_non_tvm.joblib"
+  ],
+  "training_rows_verified_project_exclusion": true,
+  "train_population_rows_after_split_and_pr_purge": 39203536,
+  "train_sample_rows": 286242,
+  "train_positive_rows": 90711
+}

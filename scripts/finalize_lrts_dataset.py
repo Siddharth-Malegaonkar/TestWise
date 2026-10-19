@@ -22,7 +22,8 @@ TEST_FIELDS = [
     'changed_test_file_count', 'path_token_overlap_count', 'path_token_overlap_ratio',
     'test_file_changed', 'path_prefix_overlap_depth', 'prior_runs', 'prior_fails',
     'fail_rate', 'fails_last5', 'fails_last20', 'last_outcome', 'runs_since_fail',
-    'last_duration', 'mean_duration', 'build_result',
+    'last_duration', 'mean_duration', 'file_test_link_failure_count',
+    'file_test_link_max_failures', 'build_result',
 ]
 RUN_FIELDS = [
     'project', 'stage_id', 'run_idx', 'run_key', 'build_key', 'pr_name', 'build_id',
@@ -39,7 +40,8 @@ MODEL_FEATURES = [
     'changed_test_file_count', 'path_token_overlap_count', 'path_token_overlap_ratio',
     'test_file_changed', 'path_prefix_overlap_depth', 'prior_runs', 'prior_fails',
     'fail_rate', 'fails_last5', 'fails_last20', 'last_outcome', 'runs_since_fail',
-    'last_duration', 'mean_duration',
+    'last_duration', 'mean_duration', 'file_test_link_failure_count',
+    'file_test_link_max_failures',
 ]
 POST_RUN_FIELDS = [
     'duration', 'build_result', 'build_duration', 'test_suite_duration_s',
@@ -143,6 +145,72 @@ def flush(writer, buffer):
         buffer.clear()
 
 
+def upgrade_existing_file_links(output_dir, test_path, manifest_path):
+    """Stream an existing finalized table to add prior-only file/test links.
+
+    This avoids replaying the nested source archive when every pre-link corpus
+    field has already been finalized.  It still reconstructs the link history
+    from chronological rows and recorded code changes before atomically
+    replacing the modeling table.
+    """
+    header = pd.read_csv(test_path, nrows=0).columns.tolist()
+    if set(['file_test_link_failure_count', 'file_test_link_max_failures']).issubset(header):
+        return False
+    changes = pd.read_csv(output_dir / 'lrts_code_changes_v1.csv.gz',
+                          usecols=['build_key', 'filename'])
+    changed_paths = {key: tuple(dict.fromkeys(normalized_path(name) for name in group.filename if normalized_path(name)))
+                     for key, group in changes.groupby('build_key', sort=False)}
+    output_columns = header[:-1] + ['file_test_link_failure_count', 'file_test_link_max_failures'] + header[-1:]
+    temp_path = test_path.with_suffix(test_path.suffix + '.tmp')
+    history = defaultdict(int)
+    pending = None
+
+    def emit(group, writer):
+        if group.empty:
+            return
+        project, stage, build = str(group.project.iloc[0]), str(group.stage_id.iloc[0]), str(group.build_key.iloc[0])
+        paths = changed_paths.get(build, ())
+        test_ids = group.test_id.astype(str).to_numpy()
+        keys = [[(project, stage, test_id, path) for path in paths] for test_id in test_ids]
+        group = group.copy()
+        group['file_test_link_failure_count'] = [sum(history[key] for key in row) for row in keys]
+        group['file_test_link_max_failures'] = [max((history[key] for key in row), default=0) for row in keys]
+        failures = group.outcome.to_numpy(np.int8)
+        for row, failed in zip(keys, failures):
+            if failed:
+                for key in row:
+                    history[key] += 1
+        group.to_csv(writer, index=False, header=False, columns=output_columns)
+
+    with gzip.open(temp_path, 'wt', newline='', encoding='utf-8', compresslevel=1) as writer:
+        pd.DataFrame(columns=output_columns).to_csv(writer, index=False)
+        # Keep groupby materialization bounded on the large Kafka stages.
+        for chunk in pd.read_csv(test_path, chunksize=25_000,
+                                 dtype={'project': 'string', 'stage_id': 'string', 'test_id': 'string'}):
+            chunk['_upgrade_run'] = (chunk.project.astype(str) + '|' + chunk.stage_id.astype(str)
+                                     + '|' + chunk.run_idx.astype(str))
+            if pending is not None:
+                chunk = pd.concat([pending, chunk], ignore_index=True)
+            groups = list(chunk.groupby('_upgrade_run', sort=False))
+            for _, group in groups[:-1]:
+                emit(group.drop(columns='_upgrade_run'), writer)
+            pending = groups[-1][1] if groups else None
+            writer.flush()
+        if pending is not None:
+            emit(pending.drop(columns='_upgrade_run'), writer)
+    temp_path.replace(test_path)
+    stats = json.loads(manifest_path.read_text(encoding='utf-8'))
+    stats['model_features'] = MODEL_FEATURES
+    stats['file_test_link_history'] = {
+        'key': ['project', 'stage_id', 'normalized_changed_file', 'test_id'],
+        'features': ['file_test_link_failure_count', 'file_test_link_max_failures'],
+        'update_order': 'Read prior failures before emitting a run; update links from current failures afterward.',
+        'build_mode': 'streamed upgrade of existing finalized chronology',
+    }
+    manifest_path.write_text(json.dumps(stats, indent=2), encoding='utf-8')
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description='Build a language-agnostic LRTS test-selection corpus.')
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'data' / 'processed' / 'lrts_v1')
@@ -167,6 +235,14 @@ def main():
         raise FileExistsError('Refusing to overwrite existing files; use --overwrite: '
                               + ', '.join(map(str, existing)))
 
+    # A complete prior corpus can be upgraded directly. This is equivalent for
+    # the new prior-only link features and avoids an hours-long nested-archive
+    # replay on constrained Windows machines.
+    if args.overwrite and test_path.exists() and manifest_path.exists():
+        if upgrade_existing_file_links(output_dir, test_path, manifest_path):
+            print('Upgraded finalized corpus with prior-only file/test link features.')
+            return
+
     suffix_tmp = '.tmp'
     temp_paths = [path.with_suffix(path.suffix + suffix_tmp) for path in output_paths]
     stats = {
@@ -176,6 +252,11 @@ def main():
         'model_features': MODEL_FEATURES,
         'post_run_fields_forbidden_as_model_features': POST_RUN_FIELDS,
         'history_key': ['project', 'stage_id', 'test_id'],
+        'file_test_link_history': {
+            'key': ['project', 'stage_id', 'normalized_changed_file', 'test_id'],
+            'features': ['file_test_link_failure_count', 'file_test_link_max_failures'],
+            'update_order': 'Read prior failures before emitting a run; update links from current failures afterward.',
+        },
         'time_order': 'build_timestamp, stable within project and stage',
         'normalization': {
             'unit': 'one row per observed (project, stage_id, run_idx, test_id)',
@@ -221,6 +302,7 @@ def main():
         changes_cache = {}
         emitted_build_changes = set()
         history = {}
+        file_test_failure_history = defaultdict(int)
         project_summary = {}
         test_buffer, run_buffer, change_buffer = [], [], []
         try:
@@ -291,6 +373,9 @@ def main():
                     build_changes = changes_cache[build_member_key]
                     change_available = build_changes is not None
                     changed_paths = [item['filename'] for item in (build_changes or [])]
+                    normalized_changed_paths = tuple(dict.fromkeys(
+                        path for path in (normalized_path(name) for name in changed_paths) if path
+                    ))
                     if change_available:
                         pstats['compare_build_keys'].add(build_member_key[1])
                         if build_member_key not in emitted_build_changes:
@@ -319,6 +404,9 @@ def main():
                         prefix_depth = max((common_prefix_depth(test_parent, parent)
                                             for parent in change_parents), default=0)
                         state_key = (project, str(run.stage_id), test_id)
+                        link_keys = [(project, str(run.stage_id), test_id, path)
+                                     for path in normalized_changed_paths]
+                        link_failures = [file_test_failure_history[key] for key in link_keys]
                         state = history.get(state_key)
                         if state is None:
                             state = {
@@ -352,9 +440,14 @@ def main():
                             'last_duration': state['last_duration'] if state['last_duration'] is not None else 0.0,
                             'mean_duration': (state['duration_sum'] / state['duration_count']
                                               if state['duration_count'] else 0.0),
+                            'file_test_link_failure_count': sum(link_failures),
+                            'file_test_link_max_failures': max(link_failures, default=0),
                             'build_result': run.build_result,
                         })
                         outcome = int(test.outcome)
+                        if outcome:
+                            for key in link_keys:
+                                file_test_failure_history[key] += 1
                         if outcome:
                             state['last_fail_seen'] = state['seen']
                         state['seen'] += 1
