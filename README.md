@@ -1,5 +1,16 @@
 # TestWise
 
+## Streamlit dashboard
+
+Install the project requirements and start the UI with:
+
+```powershell
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+The dashboard currently uses the supplied UI sample data. Its controls are local UI state; the screen does not call a backend service.
+
 TestWise ranks candidate tests by estimated probability of a failure, using the LRTS per-test `outcome` label. The model does not predict test relevance to changed code and does not execute tests.
 
 ## Model scope
