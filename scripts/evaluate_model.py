@@ -502,7 +502,7 @@ def main():
     print('\nSaved evaluation artifacts:')
     for path in outputs:
         print(path)
-    from finalize_non_tvm_report import main as finalize_report
+    from generate_model_report import main as finalize_report
     finalize_report()
 
 

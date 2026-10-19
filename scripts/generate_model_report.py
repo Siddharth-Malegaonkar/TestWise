@@ -20,7 +20,7 @@ def main():
     audit_path = DATA / 'lrts_run_audit_v1.csv.gz'
     manifest_path = EVAL / 'non_tvm_evaluation_manifest.json'
     if not results_path.is_file():
-        raise FileNotFoundError(f'Run scripts/evaluate_lrts_non_tvm.py first: {results_path}')
+        raise FileNotFoundError(f'Run scripts/evaluate_model.py first: {results_path}')
     results = pd.read_csv(results_path)
     audit = pd.read_csv(audit_path, dtype={'project': 'string', 'stage_id': 'string'})
     audit = audit.loc[audit['project'].astype(str).str.lower().ne('tvm')].copy()
@@ -138,7 +138,7 @@ def main():
             model_row = bandit_results.loc[(bandit_results['project'] == 'all_non_tvm') & (bandit_results['method'] == 'model')].iloc[0]
             report.append(f"The separate 10% chronological bandit replay caught {bandit_row.failure_recall_pct:.2f}% of failures and had {bandit_row.duration_savings_proxy_pct:.2f}% duration savings proxy, versus {model_row.failure_recall_pct:.2f}% and {model_row.duration_savings_proxy_pct:.2f}% for the supervised model. It trades failure catch for lower selected duration and is not selected as the default policy.")
         else:
-            report.append('A prior bandit replay exists but does not match the current model artifact; rerun `scripts/replay_bandit_non_tvm.py` before using it.')
+            report.append('A prior bandit replay exists but does not match the current model artifact; rerun `scripts/replay_bandit_evaluation.py` before using it.')
     report += [
         'The duration-based measure is a selected-duration savings proxy, not an execution-order simulator. Partial execution can miss failures; the full-suite baseline remains the complete test run.',
         'The fitted model is validated only on these nine LRTS projects. Historical features require real prior CI results. New repositories need a test identifier mapping, current change features, and a policy for absent history; the prediction module rejects missing feature values rather than inventing them.',

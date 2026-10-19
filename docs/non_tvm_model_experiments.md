@@ -45,7 +45,7 @@ Each cell is the project mean with its 95% run-stage bootstrap interval. The num
 
 ## Change-awareness feature
 
-The dataset builder now computes `file_test_link_failure_count` and `file_test_link_max_failures`: prior failures for a test among earlier runs that changed each file in the current run, aggregated as sum and maximum over current changed files. Updates occur only after scoring a run, preserving prior-only semantics. The current processed modeling table and the experiment above predate this addition. Rebuild the processed corpus with `scripts/finalize_lrts_dataset.py --overwrite` and rerun the experiment before using this signal in an artifact or reporting its effect.
+The dataset builder now computes `file_test_link_failure_count` and `file_test_link_max_failures`: prior failures for a test among earlier runs that changed each file in the current run, aggregated as sum and maximum over current changed files. Updates occur only after scoring a run, preserving prior-only semantics. The current processed modeling table and the experiment above predate this addition. Rebuild the processed corpus with `scripts/build_dataset.py --overwrite` and rerun the experiment before using this signal in an artifact or reporting its effect.
 
 The change-bearing and history-constrained slices do not establish that a code change caused a failure. They measure ranking on failures with diff metadata, and on tests with no prior failures or no failures in their last 20 appearances. The quiet slice still contains older failure history; only the never-failed slice has no prior test failures. The LRTS labels remain observed pass/fail outcomes.
 
@@ -53,4 +53,4 @@ The change-bearing and history-constrained slices do not establish that a code c
 
 - Per-project metrics and 95% intervals: [non_tvm_model_experiments.csv](../artifacts/evaluation/non_tvm_model_experiments.csv)
 - Reproducible runner: [run_non_tvm_model_experiments.py](../scripts/run_non_tvm_model_experiments.py)
-- Prior-only file/test history implementation: [finalize_lrts_dataset.py](../scripts/finalize_lrts_dataset.py)
+- Prior-only file/test history implementation: [build_dataset.py](../scripts/build_dataset.py)
